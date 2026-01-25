@@ -1,6 +1,7 @@
 #import "Math";
 #import "Basic";
 #import "math";
+#import "turns";
 
 Movement_Params :: struct {
     gravity_mpss := -9.81;
@@ -92,3 +93,54 @@ get_new_first_person_velocity :: (
 
     return current_velocity_copy;
 }
+
+Rotating_Movement :: struct {
+    origin : Vector3;
+    rotation_axis : Vector3;
+    radius : float;
+    rotation_rate_hz : float;
+    accumulated_time_sec : float = 0;
+}
+
+get_current_position :: (using rm : *Rotating_Movement, delta_time : float) -> Vector3 {
+    accumulated_time_sec += delta_time;
+
+    angle := accumulated_time_sec * rotation_rate_hz;
+    axis := normalize(rotation_axis);
+
+    perp : Vector3;
+    if abs(axis.x) < 0.9 {
+        perp = normalized_cross(axis, .{1, 0, 0});
+    } else {
+        perp = normalized_cross(axis, .{0, 1, 0});
+    }
+
+    // her axis, perp, and perp_basis_2 make an orthonormal basis. where
+    // perp and perp basis_2 are on the plane, allowing us to do rotations 
+    // using them
+    perp_basis_2 := cross(axis, perp);
+
+    rotated := perp * cos_turns(angle) +  perp_basis_2 * sin_turns(angle);
+
+    return origin + rotated * radius;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
