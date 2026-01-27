@@ -3,6 +3,8 @@
 #import "math";
 #import "turns";
 
+#load "god_mode.jai";
+
 Movement_Params :: struct {
     gravity_mpss := -9.81;
     acceleration_mpss : float = 10;
