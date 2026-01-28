@@ -63,7 +63,7 @@ get_new_first_person_velocity :: (
 
     current_velocity_copy := current_velocity;
 
-    xz_camera_forward := Vector3.{camera_forward.x, 0, camera_forward.z};
+    xz_camera_forward := normalize(Vector3.{camera_forward.x, 0, camera_forward.z});
     xz_camera_right := normalized_cross(xz_camera_forward , Y3);
 
     raw_input := get_xz_input(fpmi);
