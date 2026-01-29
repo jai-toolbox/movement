@@ -58,7 +58,7 @@ get_new_first_person_velocity :: (
             camera_forward: Vector3, 
             dt : float, 
             ground_state : Ground_State, 
-            mp : Movement_Params
+            mp : Movement_Params = .{}
             ) -> Vector3 {
 
     current_velocity_copy := current_velocity;
