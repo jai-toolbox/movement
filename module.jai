@@ -1,7 +1,8 @@
 #import "Math";
 #import "Basic";
-#import "tbx_math";
-#import "turns";
+
+#import "tbx/math";
+#import "tbx/turns";
 
 #load "god_mode.jai";
 
