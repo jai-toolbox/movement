@@ -60,7 +60,7 @@ get_new_first_person_velocity :: (
             dt : float, 
             ground_state : Ground_State, 
             mp : Movement_Params = .{}
-            ) -> Vector3 {
+            ) -> Vector3, jump_occurred: bool {
 
     current_velocity_copy := current_velocity;
 
@@ -84,17 +84,21 @@ get_new_first_person_velocity :: (
     current_velocity_copy.x = horizontal_velocity.x;
     current_velocity_copy.z = horizontal_velocity.z;
 
+    jump_occurred := false;
+
     if (ground_state == .ON_GROUND) {
         if (current_velocity_copy.y < 0.0)
             current_velocity_copy.y = 0;
 
-        if (fpmi.jump_pressed)
+        if (fpmi.jump_pressed) {
             current_velocity_copy.y = mp.jump_force;
+            jump_occurred = true;
+        }
     }
     
     current_velocity_copy.y += mp.gravity_mpss * dt;
 
-    return current_velocity_copy;
+    return current_velocity_copy, jump_occurred;
 }
 
 Rotating_Movement :: struct {
