@@ -147,7 +147,7 @@ apply_ground_friction_to_velocity :: (velocity: *Vector3, movement_state: *CPMA_
     velocity.z *= speed_retention_ratio;
 }
 
-update_velocity_while_on_ground :: (velocity: *Vector3, movement_input: First_Person_Movement_Input, movement_state: *CPMA_Movement_State, forward_direction: Vector3, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
+update_velocity_while_on_ground :: (velocity: *Vector3, movement_input: First_Person_Movement_Input, movement_state: *CPMA_Movement_State, forward_direction: Vector3, dt: float, movement_params : CPMA_Movement_Parameters = .{}) -> jump_ocurred : bool {
     if !movement_state.pressed_and_held_jump_since_last_jump
         apply_ground_friction_to_velocity(velocity, movement_state, 1.0, dt, movement_params);
 
@@ -196,6 +196,9 @@ update_velocity_while_on_ground :: (velocity: *Vector3, movement_input: First_Pe
     if movement_state.pressed_and_held_jump_since_last_jump {
         velocity.y = movement_params.jump_speed;
         movement_state.pressed_and_held_jump_since_last_jump = false;
+        return true;
+    } else {
+        return false;
     }
 }
 
@@ -216,7 +219,7 @@ transform_input_direction_to_world_space :: (camera_forward: Vector3, local_inpu
 #import "Input";
 
 
-update :: (movement_state: *CPMA_Movement_State, movement_input: First_Person_Movement_Input, position: *Vector3, velocity: *Vector3, on_ground: *bool, forward: Vector3, collision_map: *Collision_Geometries, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
+update :: (movement_state: *CPMA_Movement_State, movement_input: First_Person_Movement_Input, position: *Vector3, velocity: *Vector3, on_ground: *bool, forward: Vector3, collision_map: *Collision_Geometries, dt: float, movement_params : CPMA_Movement_Parameters = .{}) -> bool {
 
     set(*movement_state.jump_tbs, movement_input.jump_pressed);
     process(*movement_state.jump_tbs);
@@ -227,8 +230,10 @@ update :: (movement_state: *CPMA_Movement_State, movement_input: First_Person_Mo
     // but if you've re-queued it and let go of jump, then you're no longer going to jump when you hit the ground.
     if !movement_input.jump_pressed movement_state.pressed_and_held_jump_since_last_jump = false;
 
+    jump_occurred : bool = false;
+
     if on_ground.*
-        update_velocity_while_on_ground(velocity, movement_input, movement_state, forward, dt, movement_params);
+        jump_occurred = update_velocity_while_on_ground(velocity, movement_input, movement_state, forward, dt, movement_params);
     else
         update_velocity_while_in_air(velocity, movement_input, movement_state, forward, dt, movement_params);
 
@@ -237,4 +242,5 @@ update :: (movement_state: *CPMA_Movement_State, movement_input: First_Person_Mo
     ellipsoid_radius := Vector3.{0.4, 1.75 / 2.0, 0.4};
     resolve_collisions_against_body_ellipsoid(collision_map.*, ellipsoid_radius, position, *displacement, on_ground);
 
+    return jump_occurred;
 }
