@@ -16,24 +16,13 @@ CPMA_Movement_Parameters :: struct {
 
 }
 
-// velocity and pos here, because we assume they are controlled by other systems
+#import "tbx/temporal_binary_switch";
+
+// velocity and pos not here, because we assume they are controlled by other systems
 CPMA_Movement_State :: struct {
-    pressed_jump_since_last_jump : bool = false;
-    // we only read this value. should we extract it?
-    forward_input : float;
-    right_input   : float;
+    jump_tbs : Temporal_Binary_Switch;
+    pressed_and_held_jump_since_last_jump : bool = false;
 }
-
-set_movement_input :: (using cms: *CPMA_Movement_State) {
-    forward_input = 0.0;
-    right_input   = 0.0;
-
-    if is_key_down(xx #char "W") forward_input += 1.0;
-    if is_key_down(xx #char "S") forward_input -= 1.0;
-    if is_key_down(xx #char "D") right_input   += 1.0;
-    if is_key_down(xx #char "A") right_input   -= 1.0;
-}
-
 
 apply_velocity_in_input_direction_capped_to_scaled_speed :: (velocity: *Vector3, movement_state: *CPMA_Movement_State, input_direction: Vector3, speed_scaling_factor: float, accel: float, dt: float) {
 
@@ -51,8 +40,11 @@ apply_velocity_in_input_direction_capped_to_scaled_speed :: (velocity: *Vector3,
     velocity.z += velocity_gained_from_acceleration_this_frame * input_direction.z;
 }
 
-adjust_velocity_direction_for_air_control :: (velocity: *Vector3, movement_state: *CPMA_Movement_State, wishdir: Vector3, wishspeed: float, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
-    if abs(movement_state.forward_input) < 0.001 || abs(wishspeed) < 0.001
+adjust_velocity_direction_for_air_control :: (velocity: *Vector3, movement_input: First_Person_Movement_Input, movement_state: *CPMA_Movement_State, wishdir: Vector3, wishspeed: float, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
+
+    forward_input, right_input := get_forward_and_side_input(movement_input);
+
+    if abs(forward_input) < 0.001 || abs(wishspeed) < 0.001
         return;
 
     original_vertical_speed := velocity.y;
@@ -76,10 +68,12 @@ adjust_velocity_direction_for_air_control :: (velocity: *Vector3, movement_state
     velocity.z *= current_horizontal_speed;
 }
 
-update_velocity_while_in_air :: (velocity: *Vector3, movement_state: *CPMA_Movement_State, forward_direction: Vector3, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
-    set_movement_input(movement_state);
+update_velocity_while_in_air :: (velocity: *Vector3, movement_input: First_Person_Movement_Input, movement_state: *CPMA_Movement_State, forward_direction: Vector3, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
+    // set_movement_input(movement_state);
 
-    input_direction := Vector3.{movement_state.right_input, 0, movement_state.forward_input};
+    forward_input, right_input := get_forward_and_side_input(movement_input);
+
+    input_direction := Vector3.{right_input, 0, forward_input};
     input_direction = transform_input_direction_to_world_space(forward_direction, input_direction);
 
     desired_speed := length(input_direction) * movement_params.move_speed;
@@ -94,8 +88,8 @@ update_velocity_while_in_air :: (velocity: *Vector3, movement_state: *CPMA_Movem
     else
         acceleration = movement_params.air_acceleration;
 
-    is_side_strafing_only := movement_state.forward_input == 0 && movement_state.right_input != 0;
-    is_moving_forward_only := movement_state.forward_input != 0 && movement_state.right_input == 0;
+    is_side_strafing_only := forward_input == 0 && right_input != 0;
+    is_moving_forward_only := forward_input != 0 && right_input == 0;
 
     if is_side_strafing_only {
         if desired_speed > movement_params.side_strafe_speed
@@ -129,7 +123,7 @@ update_velocity_while_in_air :: (velocity: *Vector3, movement_state: *CPMA_Movem
     }
 
     if movement_params.air_control > 0
-        adjust_velocity_direction_for_air_control(velocity, movement_state, input_direction, desired_speed_for_air_control, dt, movement_params);
+        adjust_velocity_direction_for_air_control(velocity, movement_input, movement_state, input_direction, desired_speed_for_air_control, dt, movement_params);
 
     velocity.y -= movement_params.gravity * dt;
 }
@@ -153,19 +147,21 @@ apply_ground_friction_to_velocity :: (velocity: *Vector3, movement_state: *CPMA_
     velocity.z *= speed_retention_ratio;
 }
 
-update_velocity_while_on_ground :: (velocity: *Vector3, movement_state: *CPMA_Movement_State, forward_direction: Vector3, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
-    if !movement_state.pressed_jump_since_last_jump
+update_velocity_while_on_ground :: (velocity: *Vector3, movement_input: First_Person_Movement_Input, movement_state: *CPMA_Movement_State, forward_direction: Vector3, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
+    if !movement_state.pressed_and_held_jump_since_last_jump
         apply_ground_friction_to_velocity(velocity, movement_state, 1.0, dt, movement_params);
 
-    set_movement_input(movement_state);
+    // set_movement_input(movement_state);
 
-    input_direction := Vector3.{movement_state.right_input, 0, movement_state.forward_input};
+    forward_input, right_input := get_forward_and_side_input(movement_input);
+
+    input_direction := Vector3.{right_input, 0, forward_input};
     input_direction = transform_input_direction_to_world_space(forward_direction, input_direction);
     input_direction = unit_vector(input_direction);
 
     desired_speed := length(input_direction) * movement_params.move_speed;
 
-    is_moving_forward_only := movement_state.forward_input != 0 && movement_state.right_input == 0;
+    is_moving_forward_only := forward_input != 0 && right_input == 0;
 
     if is_moving_forward_only {
         horizontal_velocity := Vector3.{velocity.x, 0, velocity.z};
@@ -197,9 +193,9 @@ update_velocity_while_on_ground :: (velocity: *Vector3, movement_state: *CPMA_Mo
 
     velocity.y = -movement_params.gravity * dt;
 
-    if movement_state.pressed_jump_since_last_jump {
+    if movement_state.pressed_and_held_jump_since_last_jump {
         velocity.y = movement_params.jump_speed;
-        movement_state.pressed_jump_since_last_jump = false;
+        movement_state.pressed_and_held_jump_since_last_jump = false;
     }
 }
 
@@ -220,15 +216,21 @@ transform_input_direction_to_world_space :: (camera_forward: Vector3, local_inpu
 #import "Input";
 
 
-update :: (movement_state: *CPMA_Movement_State, position: *Vector3, velocity: *Vector3, on_ground: *bool, forward: Vector3, collision_map: *Collision_Geometries, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
+update :: (movement_state: *CPMA_Movement_State, movement_input: First_Person_Movement_Input, position: *Vector3, velocity: *Vector3, on_ground: *bool, forward: Vector3, collision_map: *Collision_Geometries, dt: float, movement_params : CPMA_Movement_Parameters = .{}) {
 
-    if is_key_just_pressed(xx #char " ") movement_state.pressed_jump_since_last_jump = true;
-    if !is_key_down(xx #char " ") movement_state.pressed_jump_since_last_jump = false;
+    set(*movement_state.jump_tbs, movement_input.jump_pressed);
+    process(*movement_state.jump_tbs);
+
+    // this re-queues the jump.
+    if just_switched_on(*movement_state.jump_tbs) movement_state.pressed_and_held_jump_since_last_jump = true;
+
+    // but if you've re-queued it and let go of jump, then you're no longer going to jump when you hit the ground.
+    if !movement_input.jump_pressed movement_state.pressed_and_held_jump_since_last_jump = false;
 
     if on_ground.*
-        update_velocity_while_on_ground(velocity, movement_state, forward, dt, movement_params);
+        update_velocity_while_on_ground(velocity, movement_input, movement_state, forward, dt, movement_params);
     else
-        update_velocity_while_in_air(velocity, movement_state, forward, dt, movement_params);
+        update_velocity_while_in_air(velocity, movement_input, movement_state, forward, dt, movement_params);
 
     displacement := velocity.* * dt;
 
