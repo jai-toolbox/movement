@@ -1,5 +1,5 @@
 CPMA_Movement_Parameters :: struct {
-    gravity  : float = 20.0;
+    gravity  : float = 40.0;
     friction : float = 6.0;
 
     // all speeds are measured in meters per second
@@ -12,7 +12,7 @@ CPMA_Movement_Parameters :: struct {
     air_control              : float = 0.3;
     side_strafe_acceleration : float = 50.0;
     side_strafe_speed        : float = 1.0;
-    jump_speed               : float = 8.0;
+    jump_speed               : float = 10.0;
 
 }
 
