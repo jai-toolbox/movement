@@ -225,7 +225,7 @@ update :: (movement_state: *CPMA_Movement_State, movement_input: First_Person_Mo
     process(*movement_state.jump_tbs);
 
     // this re-queues the jump.
-    if just_switched_on(*movement_state.jump_tbs) movement_state.pressed_and_held_jump_since_last_jump = true;
+    if just_switched_on(movement_state.jump_tbs) movement_state.pressed_and_held_jump_since_last_jump = true;
 
     // but if you've re-queued it and let go of jump, then you're no longer going to jump when you hit the ground.
     if !movement_input.jump_pressed movement_state.pressed_and_held_jump_since_last_jump = false;
