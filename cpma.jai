@@ -47,6 +47,8 @@ CPMA_Movement_State :: struct {
     time_since_last_jump_ms: float = 999999.0;
 }
 
+DEBUG_CPMA_COLLISION :: false;
+
 
 get_horizontal_component :: (v: Vector3) -> Vector3 {
     return .{v.x, 0, v.z};
@@ -377,6 +379,18 @@ update :: (
 ) -> bool {
     movement_state.time_since_last_jump_ms += dt * 1000.0;
 
+    #if DEBUG_CPMA_COLLISION {
+        forward_input_for_log, right_input_for_log := get_forward_and_side_input(movement_input);
+        print("[cpma:start] dt=% pos=(%, %, %) vel=(%, %, %) on_ground_in=% input_forward=% input_right=% jump=%\n",
+            dt,
+            position.x, position.y, position.z,
+            velocity.x, velocity.y, velocity.z,
+            on_ground.*,
+            forward_input_for_log,
+            right_input_for_log,
+            movement_input.jump_pressed);
+    }
+
     set(*movement_state.jump_tbs, movement_input.jump_pressed);
     process(*movement_state.jump_tbs);
 
@@ -409,12 +423,43 @@ update :: (
         );
     }
 
+    #if DEBUG_CPMA_COLLISION {
+        print("[cpma:after-move-accel] vel=(%, %, %) jump_occurred=%\n",
+            velocity.x, velocity.y, velocity.z,
+            jump_occurred);
+    }
+
+    if on_ground.* && !jump_occurred {
+        #if DEBUG_CPMA_COLLISION {
+            if abs(velocity.y) > 0.0001 {
+                print("[cpma:ground-clear-y-before-intent] old_y=%\n", velocity.y);
+            }
+        }
+
+        velocity.y = 0.0;
+    }
+
     displacement := velocity.* * dt;
     gravity_displacement := Vector3.{0, -movement_params.gravity * dt * dt, 0};
 
+    #if DEBUG_CPMA_COLLISION {
+        print("[cpma:before-gravity] displacement=(%, %, %) gravity_displacement=(%, %, %) vel_before_gravity=(%, %, %)\n",
+            displacement.x, displacement.y, displacement.z,
+            gravity_displacement.x, gravity_displacement.y, gravity_displacement.z,
+            velocity.x, velocity.y, velocity.z);
+    }
+
+    velocity.y -= movement_params.gravity * dt;
+
+    #if DEBUG_CPMA_COLLISION {
+        print("[cpma:after-gravity] vel=(%, %, %) gravity_delta_y=%\n",
+            velocity.x, velocity.y, velocity.z,
+            -movement_params.gravity * dt);
+    }
+
     ellipsoid_radius := Vector3.{0.4, 1.75 / 2.0, 0.4};
 
-    resolve_collisions_against_body_ellipsoid(
+    collision_result := resolve_collisions_against_body_ellipsoid(
         collision_map.*,
         ellipsoid_radius,
         position,
@@ -423,8 +468,34 @@ update :: (
         gravity_displacement
     );
 
-    if dt > 0.000001 {
-        velocity.* = displacement / dt;
+    #if DEBUG_CPMA_COLLISION {
+        print("[cpma:collision-result] pos_after=(%, %, %) accepted_displacement=(%, %, %) vel_pre_clip=(%, %, %) on_ground_out=% collision=%\n",
+            position.x, position.y, position.z,
+            displacement.x, displacement.y, displacement.z,
+            velocity.x, velocity.y, velocity.z,
+            on_ground.*,
+            collision_result.collision_occurred);
+    }
+
+    if collision_result.on_ground {
+        clipped: float = 0.0;
+        if velocity.y < 0.0 {
+            clipped = -velocity.y;
+            velocity.y = 0.0;
+        }
+
+        #if DEBUG_CPMA_COLLISION {
+            print("[cpma:clip-ground] clipped_downward_y=% vel_after=(%, %, %)\n",
+                clipped,
+                velocity.x, velocity.y, velocity.z);
+        }
+    }
+
+    #if DEBUG_CPMA_COLLISION {
+        print("[cpma:end] pos=(%, %, %) vel=(%, %, %) on_ground=%\n",
+            position.x, position.y, position.z,
+            velocity.x, velocity.y, velocity.z,
+            on_ground.*);
     }
 
     return jump_occurred;
