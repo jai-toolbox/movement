@@ -5,13 +5,14 @@
 
 CPMA_Movement_Parameters :: struct {
 
-    gravity: float = 35.0; // 800 ups/s^2 -> 25 m/s^2
+    gravity: float = 25.0; // 800 ups/s^2 -> 25 m/s^2
 
     // ground
     friction: float = 6.0;
     stopspeed: float = 3.125;        // 100 ups -> 3.125 m/s
     run_acceleration: float = 15.0;
-    max_run_speed: float = 10.0;     // 320 ups -> 10 m/s
+    // max_run_speed: float = 10.0;     // 320 ups -> 10 m/s
+    max_run_speed: float = 10.0;     // 320 ups -> 10 m/s (factor is x32)
 
     // air normal movement
     air_acceleration: float = 1.0;
@@ -28,7 +29,7 @@ CPMA_Movement_Parameters :: struct {
     aircontrol_base: float = 32.0;
     forward_wish_accel: float = 0.0;
 
-    jump_velocity: float = 8.4375;        // 270 ups -> 8.4375 m/s
+    jump_velocity: float = 8.5;        // 270 ups -> 8.4375 m/s
     double_jump_velocity: float = 3.125;  // 100 ups -> 3.125 m/s
     double_jump_window_ms: float = 400.0;
 
@@ -440,7 +441,7 @@ update :: (
     }
 
     displacement := velocity.* * dt;
-    gravity_displacement := Vector3.{0, -movement_params.gravity * dt * dt, 0};
+    gravity_displacement := Vector3.{0, -0.5 * movement_params.gravity * dt * dt, 0};
 
     #if DEBUG_CPMA_COLLISION {
         print("[cpma:before-gravity] displacement=(%, %, %) gravity_displacement=(%, %, %) vel_before_gravity=(%, %, %)\n",
@@ -463,7 +464,8 @@ update :: (
         collision_map.*,
         ellipsoid_radius,
         position,
-        *displacement,
+        velocity,
+        dt,
         on_ground,
         gravity_displacement
     );
