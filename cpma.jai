@@ -1,6 +1,7 @@
 #import "tbx/temporal_binary_switch";
 #import "tbx/collision";
 #import "tbx/engine";
+#import "tbx/physics";
 #import "Input";
 
 CPMA_Movement_Parameters :: struct {
@@ -64,6 +65,61 @@ get_horizontal_direction_normalized :: (dir: Vector3) -> Vector3 {
     l := length(h);
     if l < 0.0001 return .{0, 0, 1};
     return h / l;
+}
+
+resolve_collisions_against_cpma_character_virtual :: (
+    collision_map: *Collision_Geometries,
+    position: *Vector3,
+    velocity: *Vector3,
+    dt: float,
+    on_ground: *bool
+) -> Kinematic_Character_Result {
+    character_height := 1.75;
+    settings: Physics_Character_Virtual_Settings;
+    settings.capsule_radius = 0.4;
+    settings.capsule_half_height_of_cylinder = (character_height - 2.0 * settings.capsule_radius) * 0.5;
+    settings.max_slope_angle = cast(float32)0.7853981633974483; // 45 degrees, matching the old kinematic walkable-ground threshold.
+
+    center_to_bottom := settings.up * (character_height * 0.5);
+    character := physics_character_virtual_make(settings, position.* - center_to_bottom);
+    character.linear_velocity = velocity.*;
+    character.ground_state = ifx on_ground.* then .ON_GROUND else .IN_AIR;
+
+    old_position := position.*;
+    extended_settings: Physics_Character_Virtual_Extended_Update_Settings;
+    extended_settings.stick_to_floor_step_down = .{0, -0.25, 0};
+    extended_settings.walk_stairs_step_up = .{0, KINEMATIC_CHARACTER_STEP_UP_HEIGHT, 0};
+    extended_settings.walk_stairs_step_down_extra = .{0, -KINEMATIC_CHARACTER_STEP_DOWN_EXTRA, 0};
+
+    physics_character_virtual_extended_update(
+        *character,
+        cast(float32) dt,
+        ZERO3,
+        extended_settings,
+        collision_map.character_virtual_triangles
+    );
+
+    velocity.* = physics_character_virtual_clip_velocity(*character, character.linear_velocity);
+    position.* = character.position + center_to_bottom;
+
+    result: Kinematic_Character_Result;
+    result.new_position = position.*;
+    result.new_displacement = position.* - old_position;
+    result.ground_normal = character.ground_normal;
+    result.on_ground = character.ground_state == .ON_GROUND;
+    result.collision_occurred = character.active_contact_count > 0;
+    if character.ground_state == .ON_GROUND {
+        result.ground_state = .ON_GROUND;
+    } else if character.ground_state == .ON_STEEP_GROUND {
+        result.ground_state = .ON_STEEP_GROUND;
+    } else if character.ground_state == .NOT_SUPPORTED {
+        result.ground_state = .NOT_SUPPORTED;
+    } else {
+        result.ground_state = .IN_AIR;
+    }
+    on_ground.* = result.on_ground;
+
+    return result;
 }
 
 calculate_input_speed_scale :: (
@@ -469,20 +525,19 @@ update :: (
             -movement_params.gravity * dt);
     }
 
-    ellipsoid_radius := Vector3.{0.4, 1.75 / 2.0, 0.4};
-
     collision_on_ground: bool;
     collision_ground_normal: Vector3;
     collision_occurred: bool;
 
-    kinematic_result := resolve_collisions_against_kinematic_character(
-        collision_map.*,
-        ellipsoid_radius,
+    assert(collision_map.character_virtual_mesh_built && collision_map.character_virtual_triangles.count > 0,
+        "CPMA movement requires a built CharacterVirtual collision mesh.");
+
+    kinematic_result := resolve_collisions_against_cpma_character_virtual(
+        collision_map,
         position,
         velocity,
         dt,
-        on_ground,
-        gravity_displacement
+        on_ground
     );
 
     collision_on_ground = kinematic_result.on_ground;
