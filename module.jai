@@ -6,4 +6,4 @@
 
 #load "god_mode.jai";
 #load "first_person.jai";
-#load "cpma.jai";
+#load "cpma/module.jai";
