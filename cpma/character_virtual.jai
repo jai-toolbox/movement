@@ -438,6 +438,27 @@ cpma_movement_apply_impulse :: (state: *CPMA_Movement_State, impulse_world: Vect
     }
 }
 
+// Apply an externally generated weapon impulse through the same player-state
+// boundary used by CPMA's G_Damage path. The movement timer temporarily limits
+// air control after knockback; changing linear_velocity alone omits that part
+// of the weapon/movement interaction.
+cpma_movement_apply_knockback :: (
+    state: *CPMA_Movement_State,
+    impulse_world: Vector3,
+    knockback_points: s32
+) {
+    if knockback_points <= 0 || length_squared(impulse_world) <= 1.0e-12 return;
+
+    cpma_movement_apply_impulse(state, impulse_world);
+    if state.test.ps.pm_time == 0 {
+        timer_msec := knockback_points * 2;
+        if timer_msec < 50 timer_msec = 50;
+        if timer_msec > 200 timer_msec = 200;
+        state.test.ps.pm_time = timer_msec;
+        state.test.ps.pm_flags |= CPMA_PMF_TIME_KNOCKBACK;
+    }
+}
+
 // Compatibility facade for the client/server movement call site. Simulation is
 // always stepped at CPMA's 8 ms pmove cadence; render/network frame time only
 // feeds the serialized accumulator.
@@ -468,12 +489,13 @@ update :: (
     else forward_horizontal = normalize(forward_horizontal);
     right_horizontal := normalized_cross(forward_horizontal, Vector3.{0, 1, 0});
 
+    move_axis_magnitude := ifx walk_requested then 64 else 127;
     forward_axis := 0;
-    if movement_input.forward_pressed forward_axis += 127;
-    if movement_input.back_pressed forward_axis -= 127;
+    if movement_input.forward_pressed forward_axis += move_axis_magnitude;
+    if movement_input.back_pressed forward_axis -= move_axis_magnitude;
     right_axis := 0;
-    if movement_input.right_pressed right_axis += 127;
-    if movement_input.left_pressed right_axis -= 127;
+    if movement_input.right_pressed right_axis += move_axis_magnitude;
+    if movement_input.left_pressed right_axis -= move_axis_magnitude;
     up_axis := ifx movement_input.jump_pressed then 127 else 0;
 
     movement_state.accumulator_seconds += cast(float64)max(dt, 0.0);

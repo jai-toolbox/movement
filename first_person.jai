@@ -15,6 +15,8 @@ First_Person_Movement_Input :: struct {
     right_pressed : bool;
     left_pressed : bool;
     jump_pressed : bool;
+    walk_pressed : bool;
+    crouch_pressed : bool;
 }
 
 Ground_State :: enum u32 {
@@ -124,7 +126,6 @@ get_current_position :: (using rm : *Rotating_Movement, delta_time : float) -> V
 
     return origin + rotated * radius;
 }
-
 
 
 

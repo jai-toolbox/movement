@@ -54,7 +54,7 @@ Movement_State :: struct {
     jump_was_down: bool;
 }
 
-Movement_Mode :: enum u32 {
+Source_Movement_Mode :: enum u32 {
     GROUND;
     AIR;
 }
@@ -65,7 +65,7 @@ Prepared_Movement :: struct {
     velocity: Vector3;
     wish_velocity: Vector3;
     jump_velocity: Vector3;
-    mode: Movement_Mode;
+    mode: Source_Movement_Mode;
     jumped: bool;
 }
 
@@ -75,7 +75,7 @@ Movement_Output :: struct {
     requested_displacement: Vector3;
     wish_velocity: Vector3;
     jump_velocity: Vector3;
-    mode: Movement_Mode;
+    mode: Source_Movement_Mode;
     jumped: bool;
     on_ground: bool;
 }
