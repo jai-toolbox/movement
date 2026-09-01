@@ -6,7 +6,9 @@
 
 #import "Basic";
 #import "Math";
+#scope_file
 #import "tbx/physics";
+#scope_export
 #import "tbx/collision";
 
 CPMA_UNITS_PER_METER :: 32.0;

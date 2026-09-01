@@ -1,4 +1,6 @@
+#scope_file
 #import "tbx/physics";
+#scope_export
 
 Character_Virtual_Movement_Result :: struct {
     movement: Movement_Output;
